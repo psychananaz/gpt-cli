@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 mod gpt;
 mod ui;
@@ -13,12 +13,10 @@ struct Config {
 }
 
 fn read_config() -> Config {
-    // check if the config file exists
     if !std::path::Path::new("config.json").exists() {
-        // if it doesn't, create it
         let config = Config {
             api_key: "".to_string(),
-            engine: "gpt-4o".to_string(),
+            engine: "gpt-5.1".to_string(),
             max_tokens: 150,
             temperature: 0.7,
             top_p: 1.0,
@@ -29,12 +27,10 @@ fn read_config() -> Config {
     }
 
     let config_json = std::fs::read_to_string("config.json").unwrap();
-    let config: Config = serde_json::from_str(&config_json).unwrap();
-
-    config
+    serde_json::from_str(&config_json).unwrap()
 }
 
-fn main() {    
+fn main() {
     let config = read_config();
 
     if config.api_key.is_empty() {
@@ -42,30 +38,11 @@ fn main() {
         return;
     }
 
-    println!("+-----------Welcome to ChatGPT CLI-----------+");
-    println!("| Type ';exit' to exit the program           |");
-    println!("| Edit config.json to change settings        |");
-    println!("+--------------------------------------------+");
-
     let mut chatgpt_client = gpt::GPTClient::new(&config);
-    let t_runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let mut app = ui::App::new();
 
-    loop {
-        match ui::get_user_input() {
-            Some(input) => {
-                if input.to_lowercase() == ";exit" {
-                    break;
-                }
-
-                let response = t_runtime.block_on(chatgpt_client.get_response(&input));
-                match response {
-                    Ok(result) => ui::display_response(&result),
-                    Err(err) => eprintln!("Error: {}", err),
-                }
-
-                //ui::print_border();
-            }
-            None => break,
-        }
+    if let Err(error) = ui::run(&runtime, &mut chatgpt_client, &mut app) {
+        eprintln!("Error running UI: {}", error);
     }
 }
